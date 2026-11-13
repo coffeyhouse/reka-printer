@@ -20,7 +20,7 @@
 </style>
 </head>
 <body>
-<h1>Reka printer protocol test v4</h1>
+<h1>Reka printer protocol test v5</h1>
 <p class="sub">Close Fun Print first. Connect, then try each test. Each one prints its own letter so you can tell which worked.</p>
 
 <div class="row">
@@ -102,6 +102,8 @@ function makeRows(letter, msbFirst, height = 140) {
 
 // ---------- Bluetooth ----------
 let device, server, chars = {};
+// Bluefy reports short UUIDs like 'AE30'; Chrome reports full 128-bit ones.
+function shortId(u) { u = String(u).toLowerCase(); return u.length > 8 ? u.slice(4, 8) : u.padStart(4, '0').slice(-4); }
 const listeners = [];
 function waitFor(pred, ms) {
   return new Promise((resolve, reject) => {
@@ -148,12 +150,12 @@ async function connect(showAll) {
     chars = {};
     const services = await server.getPrimaryServices();
     for (const s of services) {
-      const sid = s.uuid.slice(4, 8);
+      const sid = shortId(s.uuid);
       log(`Service ${sid} (${s.uuid})`);
       let cs = [];
       try { cs = await s.getCharacteristics(); } catch (e) { log('  (could not list characteristics)'); }
       for (const c of cs) {
-        const id = c.uuid.slice(4, 8);
+        const id = shortId(c.uuid);
         const p = c.properties;
         const props = ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'].filter(k => p[k]).join(', ');
         log(`  char ${id}: ${props || 'none'}`);
@@ -259,6 +261,6 @@ $('#copy').onclick = async () => {
   catch { const r = document.createRange(); r.selectNodeContents(logEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); log('(select-all done – use Copy)'); }
 };
 if (!navigator.bluetooth) log('Web Bluetooth not available – open this page in Bluefy (iPhone) or Chrome (Android/laptop).');
-else log('Ready (v4). Close Fun Print, then tap Connect.');
+else log('Ready (v5). Close Fun Print, then tap Connect.');
 </script>
 </body>
