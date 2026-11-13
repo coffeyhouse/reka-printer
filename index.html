@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>Magic Printer</title>
+<title>Oliver &amp; George's Draw-o-Matic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <style>
@@ -16,7 +16,8 @@
   .app { height: 100dvh; display: flex; flex-direction: column; gap: 14px;
          padding: calc(14px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom)); max-width: 520px; margin: 0 auto; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; }
-  .brand { font-family: Fredoka, sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -.3px; }
+  .brand { font-family: Fredoka, sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -.3px; line-height: 1; display: flex; flex-direction: column; gap: 3px; }
+  .brand-sub { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--muted); }
   .hdr-right { display: flex; align-items: center; gap: 4px; }
   .chip { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 99px; border: 0; background: #fff; font-weight: 800; font-size: 13px; }
   .dot { width: 9px; height: 9px; border-radius: 99px; background: #B6BED6; }
@@ -96,7 +97,7 @@
 <body>
 <div class="app">
   <header>
-    <div class="brand">Magic Printer</div>
+    <div class="brand"><span class="brand-sub">Oliver &amp; George Coffey's</span>Draw-o-Matic</div>
     <div class="hdr-right">
       <button id="chip" class="chip"><span class="dot"></span><span id="chipText">Connect printer</span></button>
       <button id="gear" class="gear" aria-label="Grown-up settings (hold for 2 seconds)">
