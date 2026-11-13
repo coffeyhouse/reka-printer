@@ -279,7 +279,7 @@ $('#print').onclick = async () => {
   $('#print').disabled = true; $('#again').disabled = true;
   try {
     const rows = lastRows.slice();
-    while (rows.length < 90) rows.push(new Uint8Array(48));
+    for (let i = 0; i < 100; i++) rows.push(new Uint8Array(48)); // feed so the whole picture clears the cutter
     const n = rows.length;
     say('Printing… 🖨️');
     await send(ctrl, mxw(0xA2, [Number($('#dark').value) & 255])); await sleep(80);
