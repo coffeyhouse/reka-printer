@@ -20,7 +20,7 @@
 </style>
 </head>
 <body>
-<h1>Reka printer protocol test</h1>
+<h1>Reka printer protocol test v4</h1>
 <p class="sub">Close Fun Print first. Connect, then try each test. Each one prints its own letter so you can tell which worked.</p>
 
 <div class="row">
@@ -259,6 +259,6 @@ $('#copy').onclick = async () => {
   catch { const r = document.createRange(); r.selectNodeContents(logEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); log('(select-all done – use Copy)'); }
 };
 if (!navigator.bluetooth) log('Web Bluetooth not available – open this page in Bluefy (iPhone) or Chrome (Android/laptop).');
-else log('Ready (v3). Close Fun Print, then tap Connect.');
+else log('Ready (v4). Close Fun Print, then tap Connect.');
 </script>
 </body>
