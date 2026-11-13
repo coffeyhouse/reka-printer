@@ -130,9 +130,10 @@ async function write(ch, bytes, label) {
 
 async function connect(showAll) {
   try {
-    const optionalServices = [0xae30, 0xaf30, 0xff00, 0x18f0, 0xfee7];
+    const U = id => `0000${id}-0000-1000-8000-00805f9b34fb`;
+    const optionalServices = [U('ae30'), U('af30')];
     const opts = showAll ? { acceptAllDevices: true, optionalServices }
-      : { filters: [{ namePrefix: 'Reka' }, { services: [0xaf30] }, { services: [0xae30] }], optionalServices };
+      : { filters: [{ namePrefix: 'Reka' }], optionalServices };
     log('Opening Bluetooth chooser…');
     try {
       device = await navigator.bluetooth.requestDevice(opts);
@@ -258,6 +259,6 @@ $('#copy').onclick = async () => {
   catch { const r = document.createRange(); r.selectNodeContents(logEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); log('(select-all done – use Copy)'); }
 };
 if (!navigator.bluetooth) log('Web Bluetooth not available – open this page in Bluefy (iPhone) or Chrome (Android/laptop).');
-else log('Ready. Close Fun Print, then tap Connect.');
+else log('Ready (v3). Close Fun Print, then tap Connect.');
 </script>
 </body>
