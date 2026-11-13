@@ -51,6 +51,12 @@
   .again:active { box-shadow: 0 2px 0 var(--shadow); }
   .print { flex: 1; background: var(--print); color: var(--ink); box-shadow: 0 6px 0 #D9A21A; }
   .print:active { box-shadow: 0 2px 0 #D9A21A; }
+  .styles { display: flex; gap: 8px; overflow-x: auto; flex-shrink: 0; margin: 0 -18px; padding: 2px 18px 6px; scrollbar-width: none; }
+  .styles::-webkit-scrollbar { display: none; }
+  .style { flex-shrink: 0; height: 48px; padding: 0 14px; border-radius: 99px; border: 3px solid var(--line); background: #fff;
+           font-family: Fredoka, sans-serif; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 6px; }
+  .style .e { font-size: 20px; }
+  .style[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
   .hidden { display: none !important; }
   .toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 13px; font-weight: 800;
            padding: 8px 12px; border-radius: 99px; white-space: nowrap; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -104,6 +110,8 @@
     <div id="toast" class="toast"></div>
   </section>
 
+  <div id="styles" class="styles" role="group" aria-label="Picture style"></div>
+
   <label for="idea" class="hidden">Your idea</label>
   <input id="idea" class="idea" type="text" placeholder="A dragon eating ice cream…" enterkeyhint="go" autocomplete="off">
 
@@ -145,14 +153,14 @@
     </select>
   </div>
   <div class="field">
-    <label for="style">Drawing style</label>
-    <textarea id="style"></textarea>
+    <label for="base">Always added to every picture</label>
+    <textarea id="base"></textarea>
+    <div class="note">Keeps every style child-friendly and printable. The kid picks the style on the main screen.</div>
   </div>
   <div class="field">
     <label for="dark">Print darkness <span id="darkVal"></span></label>
     <input id="dark" type="range" min="40" max="140" step="5">
   </div>
-  <label class="toggle">Shading instead of pure lines <input id="dither" type="checkbox"></label>
   <button id="reconnect" class="ghost">Reconnect printer</button>
   <div class="note">Opened by holding the gear for 2 seconds. Protocol test page: <a href="test.html">test.html</a></div>
 </div>
@@ -160,7 +168,18 @@
 <script>
 const $ = s => document.querySelector(s);
 const WIDTH = 384;
-const DEFAULT_STYLE = 'A simple, cute black and white line drawing for a young child to colour in. Thick clean black outlines on a plain white background, no shading, no grey, no colour, no words or letters, one clear subject centred and filling the picture, friendly and suitable for children.';
+const DEFAULT_BASE = 'A friendly picture suitable for young children. Black and white only, plain white background, no words or letters, one clear subject centred and filling the picture.';
+// Every style must print well on a black-and-white thermal printer. dither = use shading when converting.
+const STYLES = [
+  { id: 'colour',  e: '🖍️', name: 'Colouring', dither: false, prompt: 'A simple, cute colouring-book page: thick clean black outlines only, big empty areas to colour in, no shading, no grey, no filled areas.' },
+  { id: 'cartoon', e: '😄', name: 'Cartoon',   dither: false, prompt: 'A bold, funny cartoon with thick black outlines and some solid black areas for contrast, like a Saturday-morning cartoon, no grey.' },
+  { id: 'sticker', e: '⭐', name: 'Sticker',   dither: false, prompt: 'A cute kawaii sticker design: chunky rounded shapes, very thick black outline around the whole sticker, big shiny eyes, no grey.' },
+  { id: 'pixel',   e: '👾', name: 'Pixel',     dither: false, prompt: 'Chunky 8-bit retro video game pixel art, big square black pixels on white, like an old arcade sprite.' },
+  { id: 'comic',   e: '💥', name: 'Comic',     dither: true,  prompt: 'A dramatic comic book ink drawing with bold action lines, black ink and halftone dot shading, no speech bubbles.' },
+  { id: 'sketch',  e: '✏️', name: 'Sketch',    dither: true,  prompt: 'A detailed pencil sketch with soft shading, like a drawing in an artist\'s sketchbook.' },
+  { id: 'random',  e: '🎲', name: 'Surprise!', dither: false, prompt: '' }
+];
+let styleId = 'colour';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------- settings (saved locally) ----------
@@ -171,16 +190,31 @@ const store = {
 $('#key').value = store.get('key', '');
 $('#model').value = store.get('model', 'gemini-2.5-flash-image');
 if (!$('#model').value) $('#model').value = 'gemini-2.5-flash-image';
-$('#style').value = store.get('style', DEFAULT_STYLE);
+$('#base').value = store.get('base', DEFAULT_BASE);
+styleId = STYLES.some(x => x.id === store.get('styleId', '')) ? store.get('styleId', '') : 'colour';
 $('#dark').value = store.get('dark', '93');
-$('#dither').checked = store.get('dither', '0') === '1';
 const showDark = () => $('#darkVal').textContent = $('#dark').value;
 showDark();
 $('#key').onchange = () => store.set('key', $('#key').value.trim());
 $('#model').onchange = () => store.set('model', $('#model').value);
-$('#style').onchange = () => store.set('style', $('#style').value.trim() || DEFAULT_STYLE);
+$('#base').onchange = () => store.set('base', $('#base').value.trim() || DEFAULT_BASE);
 $('#dark').oninput = () => { showDark(); store.set('dark', $('#dark').value); };
-$('#dither').onchange = () => { store.set('dither', $('#dither').checked ? '1' : '0'); if (lastImage) renderPreview(lastImage); };
+// style chips
+function drawChips() {
+  const box = $('#styles'); box.innerHTML = '';
+  for (const st of STYLES) {
+    const b = document.createElement('button');
+    b.className = 'style'; b.setAttribute('aria-pressed', st.id === styleId);
+    b.innerHTML = `<span class="e" aria-hidden="true">${st.e}</span>${st.name}`;
+    b.onclick = () => {
+      styleId = st.id; store.set('styleId', st.id); drawChips();
+      if (!$('#resultRow').classList.contains('hidden')) showRow(false); // new style -> draw again
+    };
+    box.appendChild(b);
+  }
+}
+drawChips();
+let usedStyle = STYLES[0];
 
 // ---------- settings sheet (hold gear 2s) ----------
 function openSheet() { $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); }
@@ -252,7 +286,10 @@ async function generate() {
   try {
     const chosen = $('#model').value || 'gemini-2.5-flash-image';
     const models = [chosen, 'gemini-2.5-flash-image', 'gemini-3.1-flash-image'].filter((m, i, a) => a.indexOf(m) === i);
-    const prompt = `${$('#style').value || DEFAULT_STYLE}\nDraw: ${idea}`;
+    let st = STYLES.find(x => x.id === styleId) || STYLES[0];
+    if (st.id === 'random') { const pool = STYLES.filter(x => x.id !== 'random'); st = pool[Math.floor(Math.random() * pool.length)]; }
+    usedStyle = st;
+    const prompt = `${st.prompt}\n${$('#base').value || DEFAULT_BASE}\nDraw: ${idea}`;
     let res, json;
     for (const model of models) {
       res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
@@ -273,6 +310,7 @@ async function generate() {
     await img.decode();
     lastImage = img; renderPreview(img);
     stage('image'); showRow(true);
+    if (styleId === 'random') toast(`Surprise: ${usedStyle.e} ${usedStyle.name}`);
   } catch (e) {
     stage('error', 'Oops!', e.message || String(e)); showRow(false);
   } finally { busy = false; $('#draw').disabled = $('#again').disabled = $('#print').disabled = false; }
@@ -289,7 +327,7 @@ function renderPreview(img) {
   const id = g.getImageData(0, 0, WIDTH, h), p = id.data;
   const lum = new Float32Array(WIDTH * h);
   for (let i = 0; i < lum.length; i++) lum[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
-  const dither = $('#dither').checked, rows = [];
+  const dither = !!(usedStyle && usedStyle.dither), rows = [];
   for (let y = 0; y < h; y++) {
     const row = new Uint8Array(WIDTH / 8);
     for (let x = 0; x < WIDTH; x++) {
