@@ -57,6 +57,11 @@
            font-family: Fredoka, sans-serif; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 6px; }
   .style .e { font-size: 20px; }
   .style[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .shapes { display: flex; gap: 8px; flex-shrink: 0; margin-top: -6px; }
+  .shape { flex: 1; height: 44px; border-radius: 14px; border: 3px solid var(--line); background: #fff; font-family: Fredoka, sans-serif; font-weight: 600; font-size: 15px;
+           display: flex; align-items: center; justify-content: center; gap: 7px; padding: 0 6px; }
+  .shape i { display: block; border: 2.5px solid currentColor; border-radius: 3px; flex-shrink: 0; }
+  .shape[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
   .btn { position: relative; }
   .badge { position: absolute; top: -9px; right: -2px; background: var(--ink); color: #fff; font-family: Nunito, sans-serif; font-weight: 800; font-size: 13px;
            padding: 4px 9px; border-radius: 99px; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
@@ -118,6 +123,7 @@
   </section>
 
   <div id="styles" class="styles" role="group" aria-label="Picture style"></div>
+  <div id="shapes" class="shapes" role="group" aria-label="Picture shape"></div>
 
   <label for="idea" class="hidden">Your idea</label>
   <input id="idea" class="idea" type="text" placeholder="A dragon eating ice cream…" enterkeyhint="go" autocomplete="off">
@@ -171,6 +177,15 @@
     <input id="dark" type="range" min="40" max="140" step="5">
   </div>
   <div class="field">
+    <label for="thick">Line thickness</label>
+    <select id="thick">
+      <option value="0">Normal</option>
+      <option value="1">Thick</option>
+      <option value="2">Extra thick</option>
+    </select>
+    <div class="note">Fattens the lines before printing so they're easier to colour in.</div>
+  </div>
+  <div class="field">
     <label for="limit">Drawings per day <span id="usedToday"></span></label>
     <div class="row2"><input id="limit" type="number" min="1" max="200" inputmode="numeric"><button id="bonus" class="ghost">Give 5 more today</button></div>
   </div>
@@ -181,17 +196,26 @@
 <script>
 const $ = s => document.querySelector(s);
 const WIDTH = 384;
-const DEFAULT_BASE = 'A friendly picture suitable for young children. Black and white only, plain white background, no words or letters, one clear subject centred and filling the picture.';
-// Every style must print well on a black-and-white thermal printer. dither = use shading when converting.
+const DEFAULT_BASE = 'A friendly picture suitable for young children, made to be coloured in with crayons. Black and white only, plain white background, no grey, no words or letters unless the style asks for them.';
+const THICK = 'Use VERY thick, bold, smooth black outlines like a fat marker pen, simple big shapes and large empty white areas to colour in, with very little tiny detail.';
+// Every style must print well on a black-and-white thermal printer and be easy to colour in. dither = keep pencil-style shading.
 const STYLES = [
-  { id: 'colour',  e: '🖍️', name: 'Colouring', dither: false, prompt: 'A simple, cute colouring-book page: thick clean black outlines only, big empty areas to colour in, no shading, no grey, no filled areas.' },
-  { id: 'cartoon', e: '😄', name: 'Cartoon',   dither: false, prompt: 'A bold, funny cartoon with thick black outlines and some solid black areas for contrast, like a Saturday-morning cartoon, no grey.' },
-  { id: 'sticker', e: '⭐', name: 'Sticker',   dither: false, prompt: 'A cute kawaii sticker design: chunky rounded shapes, very thick black outline around the whole sticker, big shiny eyes, no grey.' },
-  { id: 'pixel',   e: '👾', name: 'Pixel',     dither: false, prompt: 'Chunky 8-bit retro video game pixel art, big square black pixels on white, like an old arcade sprite.' },
-  { id: 'comic',   e: '💥', name: 'Comic',     dither: true,  prompt: 'A dramatic comic book ink drawing with bold action lines, black ink and halftone dot shading, no speech bubbles.' },
-  { id: 'sketch',  e: '✏️', name: 'Sketch',    dither: true,  prompt: 'A detailed pencil sketch with soft shading, like a drawing in an artist\'s sketchbook.' },
+  { id: 'colour',  e: '🖍️', name: 'Colouring', dither: false, prompt: `A colouring-book page for young children. ${THICK} No shading and no filled black areas.` },
+  { id: 'cartoon', e: '😄', name: 'Cartoon',   dither: false, prompt: `A bold, funny cartoon like a Saturday-morning TV show, big expressive faces. ${THICK} Only tiny touches of solid black, like pupils.` },
+  { id: 'sticker', e: '⭐', name: 'Sticker',   dither: false, prompt: `A cute kawaii sticker design with chunky rounded shapes and big shiny eyes, and an extra-thick black outline around the whole sticker. ${THICK}` },
+  { id: 'pixel',   e: '👾', name: 'Pixel',     dither: false, prompt: 'A retro 8-bit pixel-art colouring page: big chunky square pixels drawn as thick black outlines with white insides to colour in, like an arcade game sprite. No filled black areas.' },
+  { id: 'comic',   e: '💥', name: 'Comic',     dither: false, prompt: `A classic superhero comic book panel: dynamic action pose, speed lines and motion lines, a jagged starburst explosion shape behind the action, and one big comic sound-effect word such as POW, ZOOM, BAM or WHOOSH in huge bold outlined bubble letters. A thick black panel border around the picture. ${THICK} Bold black ink like a comic inker, no grey and no dot shading.` },
+  { id: 'sketch',  e: '✏️', name: 'Sketch',    dither: true,  prompt: 'A pencil sketch with soft shading, like a drawing in an artist\'s sketchbook, with strong dark outlines.' },
   { id: 'random',  e: '🎲', name: 'Surprise!', dither: false, prompt: '' }
 ];
+// Paper is 48 mm wide; length is unlimited. rotate = landscape picture turned 90° so it runs down the paper.
+const SHAPES = [
+  { id: 'square', name: 'Square', ratio: '1:1',  rotate: false, words: 'Square composition.', icon: [16, 16] },
+  { id: 'tall',   name: 'Tall',   ratio: '9:16', rotate: false, words: 'Tall portrait composition, the subject fills the whole height.', icon: [12, 20] },
+  { id: 'wide',   name: 'Wide',   ratio: '16:9', rotate: true,  words: 'Wide landscape composition, a whole scene from side to side.', icon: [22, 13] },
+  { id: 'banner', name: 'Banner', ratio: '4:1',  rotate: true,  words: 'Very wide panoramic banner composition, a long scene stretching from left to right.', icon: [26, 8] }
+];
+let shapeId = 'tall';
 let styleId = 'colour';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -203,14 +227,17 @@ const store = {
 $('#key').value = store.get('key', '');
 $('#model').value = store.get('model2', 'gemini-nano-banana-2.1');
 if (!$('#model').value) $('#model').value = 'gemini-nano-banana-2.1';
-$('#base').value = store.get('base', DEFAULT_BASE);
+$('#base').value = store.get('base2', DEFAULT_BASE);
 styleId = STYLES.some(x => x.id === store.get('styleId', '')) ? store.get('styleId', '') : 'colour';
+shapeId = SHAPES.some(x => x.id === store.get('shapeId', '')) ? store.get('shapeId', '') : 'tall';
+$('#thick').value = store.get('thick', '1');
+$('#thick').onchange = () => { store.set('thick', $('#thick').value); if (lastImage) renderPreview(lastImage); };
 $('#dark').value = store.get('dark', '93');
 const showDark = () => $('#darkVal').textContent = $('#dark').value;
 showDark();
 $('#key').onchange = () => store.set('key', $('#key').value.trim());
 $('#model').onchange = () => store.set('model2', $('#model').value);
-$('#base').onchange = () => store.set('base', $('#base').value.trim() || DEFAULT_BASE);
+$('#base').onchange = () => store.set('base2', $('#base').value.trim() || DEFAULT_BASE);
 $('#dark').oninput = () => { showDark(); store.set('dark', $('#dark').value); };
 // ---------- daily limit ----------
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -246,7 +273,21 @@ function drawChips() {
   }
 }
 drawChips();
-let usedStyle = STYLES[0];
+let usedStyle = STYLES[0], usedShape = SHAPES[1];
+function drawShapes() {
+  const box = $('#shapes'); box.innerHTML = '';
+  for (const sh of SHAPES) {
+    const b = document.createElement('button');
+    b.className = 'shape'; b.setAttribute('aria-pressed', sh.id === shapeId);
+    b.innerHTML = `<i style="width:${sh.icon[0]}px;height:${sh.icon[1]}px" aria-hidden="true"></i>${sh.name}`;
+    b.onclick = () => {
+      shapeId = sh.id; store.set('shapeId', sh.id); drawShapes();
+      if (!$('#resultRow').classList.contains('hidden')) showRow(false);
+    };
+    box.appendChild(b);
+  }
+}
+drawShapes();
 
 // ---------- settings sheet (hold gear 2s) ----------
 function openSheet() { $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); }
@@ -325,15 +366,12 @@ async function generate() {
     let st = STYLES.find(x => x.id === styleId) || STYLES[0];
     if (st.id === 'random') { const pool = STYLES.filter(x => x.id !== 'random'); st = pool[Math.floor(Math.random() * pool.length)]; }
     usedStyle = st;
-    const prompt = `${st.prompt}\n${$('#base').value || DEFAULT_BASE}\nDraw: ${idea}`;
+    const sh = SHAPES.find(x => x.id === shapeId) || SHAPES[1];
+    usedShape = sh;
+    const prompt = `${st.prompt}\n${$('#base').value || DEFAULT_BASE}\n${sh.words}\nDraw: ${idea}`;
     let res, json;
     for (const model of models) {
-      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'] } })
-      });
-      json = await res.json().catch(() => ({}));
+      ({ res, json } = await askGemini(model, key, prompt, sh.ratio));
       if (res.status !== 404) break;
     }
     if (!res.ok) throw new Error(json.error?.message || `HTTP ${res.status}`);
@@ -346,35 +384,84 @@ async function generate() {
     await img.decode();
     lastImage = img; renderPreview(img);
     store.set('used', String(quota().used + 1)); showQuota();
-    stage('image'); showRow(true);
+    stage('image'); showRow(true); fitPreview();
     if (styleId === 'random') toast(`Surprise: ${usedStyle.e} ${usedStyle.name}`);
   } catch (e) {
     stage('error', 'Oops!', e.message || String(e)); showRow(false);
   } finally { busy = false; $('#draw').disabled = $('#again').disabled = $('#print').disabled = false; }
+}
+// Google's docs differ on where the aspect ratio goes, so try each known shape of request and
+// remember the one that works. The last fallback sends no ratio (the prompt still describes the shape).
+const RATIO_FORMATS = [
+  r => ({ imageConfig: { aspectRatio: r } }),
+  r => ({ responseFormat: { image: { aspectRatio: r } } }),
+  () => ({})
+];
+let ratioFormat = parseInt(store.get('ratioFormat', '0'), 10) || 0;
+async function askGemini(model, key, prompt, ratio) {
+  let res, json;
+  for (let f = ratioFormat; f < RATIO_FORMATS.length; f++) {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'], ...RATIO_FORMATS[f](ratio) } })
+    });
+    json = await res.json().catch(() => ({}));
+    const msg = (json.error && json.error.message) || '';
+    const formatProblem = res.status === 400 && /imageConfig|responseFormat|aspect|Unknown name|Invalid JSON payload/i.test(msg);
+    if (!formatProblem || f === RATIO_FORMATS.length - 1) {
+      if (res.ok && f !== ratioFormat) { ratioFormat = f; store.set('ratioFormat', String(f)); }
+      return { res, json };
+    }
+  }
+  return { res, json };
 }
 $('#draw').onclick = generate;
 $('#again').onclick = generate;
 
 // ---------- image -> 1-bit rows ----------
 function renderPreview(img) {
-  const h = Math.max(90, Math.round(img.naturalHeight * WIDTH / img.naturalWidth));
+  // Landscape pictures for Wide/Banner are turned 90° so their long side runs down the paper.
+  const rotate = !!(usedShape && usedShape.rotate) && img.naturalWidth > img.naturalHeight;
+  const iw = rotate ? img.naturalHeight : img.naturalWidth, ih = rotate ? img.naturalWidth : img.naturalHeight;
+  const h = Math.max(90, Math.round(ih * WIDTH / iw));
   const c = $('#preview'); c.width = WIDTH; c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, WIDTH, h); g.drawImage(img, 0, 0, WIDTH, h);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, WIDTH, h);
+  if (rotate) { g.save(); g.translate(WIDTH, 0); g.rotate(Math.PI / 2); g.drawImage(img, 0, 0, h, WIDTH); g.restore(); }
+  else g.drawImage(img, 0, 0, WIDTH, h);
   const id = g.getImageData(0, 0, WIDTH, h), p = id.data;
   const lum = new Float32Array(WIDTH * h);
   for (let i = 0; i < lum.length; i++) lum[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
   const dither = !!(usedStyle && usedStyle.dither), rows = [];
+  // 1) black/white
+  let black = new Uint8Array(WIDTH * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < WIDTH; x++) {
+    const i = y * WIDTH + x, old = lum[i];
+    const on = dither ? old < 128 : old < 170;
+    black[i] = on ? 1 : 0;
+    if (dither) {
+      const err = old - (on ? 0 : 255);
+      if (x + 1 < WIDTH) lum[i + 1] += err * 7 / 16;
+      if (y + 1 < h) { if (x > 0) lum[i + WIDTH - 1] += err * 3 / 16; lum[i + WIDTH] += err * 5 / 16; if (x + 1 < WIDTH) lum[i + WIDTH + 1] += err / 16; }
+    }
+  }
+  // 2) fatten lines for colouring in (skip for shaded styles, where it would just go dark)
+  const grow = dither ? 0 : Math.max(0, Math.min(2, parseInt($('#thick').value, 10) || 0));
+  for (let pass = 0; pass < grow; pass++) {
+    const out = new Uint8Array(black);
+    for (let y = 0; y < h; y++) for (let x = 0; x < WIDTH; x++) {
+      const i = y * WIDTH + x;
+      if (black[i]) continue;
+      if ((x > 0 && black[i - 1]) || (x + 1 < WIDTH && black[i + 1]) || (y > 0 && black[i - WIDTH]) || (y + 1 < h && black[i + WIDTH])) out[i] = 1;
+    }
+    black = out;
+  }
+  // 3) pack rows for the printer + draw the preview
   for (let y = 0; y < h; y++) {
     const row = new Uint8Array(WIDTH / 8);
     for (let x = 0; x < WIDTH; x++) {
-      const i = y * WIDTH + x, old = lum[i];
-      const on = dither ? old < 128 : old < 170;
-      if (dither) {
-        const err = old - (on ? 0 : 255);
-        if (x + 1 < WIDTH) lum[i + 1] += err * 7 / 16;
-        if (y + 1 < h) { if (x > 0) lum[i + WIDTH - 1] += err * 3 / 16; lum[i + WIDTH] += err * 5 / 16; if (x + 1 < WIDTH) lum[i + WIDTH + 1] += err / 16; }
-      }
+      const i = y * WIDTH + x, on = black[i];
       p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = on ? 0 : 255;
       if (on) row[x >> 3] |= 1 << (x & 7); // LSB-first (MXW01)
     }
@@ -382,7 +469,17 @@ function renderPreview(img) {
   }
   g.putImageData(id, 0, 0);
   lastRows = rows;
+  requestAnimationFrame(fitPreview);
 }
+// Size the preview to fit the card whatever its shape (tall banners get shrunk to fit).
+function fitPreview() {
+  const c = $('#preview'), st = $('#stage');
+  if (c.style.display === 'none') return;
+  const maxW = st.clientWidth - 36, maxH = st.clientHeight - 36;
+  const k = Math.min(maxW / c.width, maxH / c.height);
+  c.style.width = Math.floor(c.width * k) + 'px'; c.style.height = Math.floor(c.height * k) + 'px';
+}
+window.addEventListener('resize', fitPreview);
 
 // ---------- printer (MXW01 protocol over BLE service AE30) ----------
 const CRC = (() => { const t = new Uint8Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) c = c & 0x80 ? ((c << 1) ^ 7) & 255 : (c << 1) & 255; t[i] = c; } return t; })();
