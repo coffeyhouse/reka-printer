@@ -2,77 +2,166 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Magic Printer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
 <style>
-  :root { --green: #1f8a70; --ink: #1b1f1d; --bg: #f3f7f5; }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
-  h1 { font-size: 24px; margin: 0; }
-  .pill { font-size: 13px; padding: 6px 10px; border-radius: 99px; background: #dfe6e3; border: 0; }
-  .pill.on { background: #c9f0de; }
-  main { padding: 8px 16px 40px; max-width: 520px; margin: 0 auto; }
-  .ask { display: flex; gap: 8px; margin: 10px 0; }
-  textarea { flex: 1; font-size: 22px; padding: 12px; border-radius: 14px; border: 2px solid #cfd8d4; resize: none; height: 96px; font-family: inherit; }
-  .mic { width: 96px; border-radius: 14px; border: 0; background: #e8505b; color: #fff; font-size: 40px; }
+  :root { --ground: #EEF3FF; --ink: #1D2340; --muted: #4A5275; --line: #C5D0EA; --shadow: #D7E0F5;
+          --mic: #E8412F; --primary: #0E7C66; --print: #FFC93C; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--ground); overflow: hidden; }
+  body { font-family: Nunito, system-ui, sans-serif; color: var(--ink); -webkit-user-select: none; user-select: none; }
+  button { font-family: inherit; color: inherit; cursor: pointer; }
+  .app { height: 100dvh; display: flex; flex-direction: column; gap: 14px;
+         padding: calc(14px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom)); max-width: 520px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0; }
+  .brand { font-family: Fredoka, sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -.3px; }
+  .hdr-right { display: flex; align-items: center; gap: 4px; }
+  .chip { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 99px; border: 0; background: #fff; font-weight: 800; font-size: 13px; }
+  .dot { width: 9px; height: 9px; border-radius: 99px; background: #B6BED6; }
+  .chip.on .dot { background: #1F9D55; }
+  .chip.busy .dot { background: #E0A100; animation: blink 1s infinite; }
+  .gear { width: 44px; height: 44px; border-radius: 99px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+  .gear svg { transition: transform .2s; }
+  .gear.holding svg { transform: rotate(120deg); transition: transform 2s linear; }
+  .stage { flex: 1 1 auto; min-height: 0; background: #fff; border-radius: 28px; box-shadow: 0 6px 0 var(--shadow);
+           display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 18px; position: relative; overflow: hidden; }
+  .stage.empty { border: 3px dashed var(--line); box-shadow: none; }
+  .bubble { width: 84px; height: 84px; border-radius: 99px; background: #FFF1C9; display: flex; align-items: center; justify-content: center; }
+  .stage h2 { font-family: Fredoka, sans-serif; font-weight: 600; font-size: 24px; margin: 0; text-align: center; }
+  .stage p { margin: 0; font-size: 16px; font-weight: 700; color: var(--muted); text-align: center; max-width: 270px; }
+  .stage p.err { color: #B3261E; }
+  #preview { max-width: 100%; max-height: 100%; image-rendering: pixelated; display: none; }
+  .wiggle { animation: wiggle 1s ease-in-out infinite; }
+  input.idea { flex-shrink: 0; height: 56px; width: 100%; border-radius: 18px; border: 3px solid var(--line); background: #fff; padding: 0 18px;
+               font-family: Nunito, sans-serif; font-weight: 700; font-size: 18px; color: var(--ink); -webkit-user-select: text; user-select: text; outline: none; }
+  input.idea:focus { border-color: var(--primary); }
+  .actions { display: flex; gap: 14px; flex-shrink: 0; }
+  .btn { height: 92px; border-radius: 28px; border: 0; display: flex; align-items: center; justify-content: center; gap: 10px;
+         font-family: Fredoka, sans-serif; font-weight: 700; font-size: 30px; transition: transform .08s, box-shadow .08s; }
+  .btn:active { transform: translateY(4px); }
+  .btn:disabled { opacity: .45; }
+  .mic { width: 92px; flex-shrink: 0; border-radius: 99px; background: var(--mic); color: #fff; box-shadow: 0 6px 0 #B22E1F; }
+  .mic:active { box-shadow: 0 2px 0 #B22E1F; }
   .mic.listening { animation: pulse 1s infinite; }
-  @keyframes pulse { 50% { opacity: .5; } }
-  .big { width: 100%; font-size: 22px; font-weight: 700; padding: 16px; border-radius: 14px; border: 0; background: var(--green); color: #fff; margin: 6px 0; }
-  .big.print { background: #2c3e50; }
-  .big:disabled { opacity: .4; }
-  .row { display: flex; gap: 8px; }
-  .row .big { flex: 1; }
-  #preview { width: 100%; background: #fff; border-radius: 14px; margin-top: 10px; display: none; image-rendering: pixelated; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
-  #msg { min-height: 26px; font-size: 17px; margin: 8px 2px; }
-  #msg.err { color: #c0392b; }
-  details { margin-top: 24px; background: #fff; border-radius: 14px; padding: 10px 14px; }
-  summary { font-weight: 600; }
-  label { display: block; font-size: 14px; margin: 12px 0 4px; }
-  input[type=text], input[type=password] { width: 100%; font-size: 15px; padding: 10px; border-radius: 10px; border: 1px solid #cfd8d4; }
-  input[type=range] { width: 100%; }
-  .small { font-size: 12px; color: #667; }
-  .spinner { display: inline-block; animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .draw { flex: 1; background: var(--primary); color: #fff; box-shadow: 0 6px 0 #095C4B; }
+  .draw:active { box-shadow: 0 2px 0 #095C4B; }
+  .again { width: 128px; flex-shrink: 0; flex-direction: column; gap: 2px; font-size: 19px; font-weight: 600; background: #fff; border: 3px solid var(--line); box-shadow: 0 6px 0 var(--shadow); }
+  .again:active { box-shadow: 0 2px 0 var(--shadow); }
+  .print { flex: 1; background: var(--print); color: var(--ink); box-shadow: 0 6px 0 #D9A21A; }
+  .print:active { box-shadow: 0 2px 0 #D9A21A; }
+  .hidden { display: none !important; }
+  .toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 13px; font-weight: 800;
+           padding: 8px 12px; border-radius: 99px; white-space: nowrap; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .scrim { position: fixed; inset: 0; background: rgba(29,35,64,.45); opacity: 0; pointer-events: none; transition: opacity .25s; }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-width: 520px; margin: 0 auto; max-height: 92dvh; overflow: auto; background: #fff; border-radius: 28px 28px 0 0;
+           padding: 12px 22px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px;
+           transform: translateY(105%); transition: transform .28s ease; -webkit-user-select: text; user-select: text; }
+  .sheet.open { transform: none; }
+  .grab { align-self: center; width: 44px; height: 5px; border-radius: 99px; background: var(--line); flex-shrink: 0; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; }
+  .sheet-head h3 { font-family: Fredoka, sans-serif; font-weight: 700; font-size: 24px; margin: 0; }
+  .done { height: 44px; padding: 0 18px; border-radius: 99px; border: 0; background: var(--primary); color: #fff; font-weight: 800; font-size: 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; }
+  .field input[type=password], .field select, .field textarea { border-radius: 14px; border: 2px solid var(--line); padding: 0 14px; font-size: 16px; font-family: Nunito, sans-serif; color: var(--ink); background: #fff; }
+  .field input[type=password], .field select { height: 48px; }
+  .field textarea { height: 92px; padding: 10px 14px; resize: none; }
+  .note { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .toggle { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; min-height: 44px; }
+  input[type=range], input[type=checkbox] { accent-color: var(--primary); }
+  input[type=checkbox] { width: 24px; height: 24px; }
+  .ghost { height: 52px; border-radius: 16px; border: 2px solid var(--line); background: #fff; font-weight: 800; font-size: 16px; }
+  @keyframes pulse { 50% { transform: scale(.94); opacity: .75; } }
+  @keyframes blink { 50% { opacity: .3; } }
+  @keyframes wiggle { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg) translateY(-4px); } }
 </style>
 </head>
 <body>
-<header>
-  <h1>🖨️ Magic Printer</h1>
-  <button id="connect" class="pill">Connect printer</button>
-</header>
-<main>
-  <div class="ask">
-    <textarea id="idea" placeholder="What shall we draw?"></textarea>
-    <button id="mic" class="mic" aria-label="Speak">🎤</button>
-  </div>
-  <button id="draw" class="big">✨ Draw it!</button>
-  <div id="msg"></div>
-  <canvas id="preview" width="384" height="384"></canvas>
-  <div class="row">
-    <button id="again" class="big" style="display:none;background:#8e44ad">🔄 Try again</button>
-    <button id="print" class="big print" style="display:none">🖨️ Print!</button>
-  </div>
+<div class="app">
+  <header>
+    <div class="brand">Magic Printer</div>
+    <div class="hdr-right">
+      <button id="chip" class="chip"><span class="dot"></span><span id="chipText">Connect printer</span></button>
+      <button id="gear" class="gear" aria-label="Grown-up settings (hold for 2 seconds)">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
 
-  <details id="settings">
-    <summary>Grown-up settings</summary>
-    <label for="key">Gemini API key (saved on this phone only)</label>
+  <section id="stage" class="stage empty">
+    <div id="placeholder" style="display:flex;flex-direction:column;align-items:center;gap:12px">
+      <div id="bubble" class="bubble">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#1D2340" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </div>
+      <h2 id="stageTitle">What shall we draw?</h2>
+      <p id="stageText">Tap the microphone and say anything you like.</p>
+    </div>
+    <canvas id="preview" width="384" height="384"></canvas>
+    <div id="toast" class="toast"></div>
+  </section>
+
+  <label for="idea" class="hidden">Your idea</label>
+  <input id="idea" class="idea" type="text" placeholder="A dragon eating ice cream…" enterkeyhint="go" autocomplete="off">
+
+  <div id="askRow" class="actions">
+    <button id="mic" class="btn mic" aria-label="Talk">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+    </button>
+    <button id="draw" class="btn draw">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+      Draw it!
+    </button>
+  </div>
+  <div id="resultRow" class="actions hidden">
+    <button id="again" class="btn again">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+      Try again
+    </button>
+    <button id="print" class="btn print">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Print!
+    </button>
+  </div>
+</div>
+
+<div id="scrim" class="scrim"></div>
+<div id="sheet" class="sheet" role="dialog" aria-label="Grown-up settings">
+  <div class="grab"></div>
+  <div class="sheet-head"><h3>Grown-ups only</h3><button id="done" class="done">Done</button></div>
+  <div class="field">
+    <label for="key">Gemini API key</label>
     <input id="key" type="password" autocomplete="off" placeholder="Paste key from aistudio.google.com">
+    <div class="note">Saved on this phone only.</div>
+  </div>
+  <div class="field">
     <label for="model">Image model</label>
-    <input id="model" type="text" value="gemini-2.5-flash-image">
-    <label for="style">Drawing style (added to every request)</label>
-    <input id="style" type="text">
-    <label for="dark">Print darkness: <span id="darkVal"></span></label>
+    <select id="model">
+      <option value="gemini-2.5-flash-image">Nano Banana (gemini-2.5-flash-image)</option>
+      <option value="gemini-3.1-flash-image">Nano Banana 2 (gemini-3.1-flash-image)</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="style">Drawing style</label>
+    <textarea id="style"></textarea>
+  </div>
+  <div class="field">
+    <label for="dark">Print darkness <span id="darkVal"></span></label>
     <input id="dark" type="range" min="40" max="140" step="5">
-    <label><input id="dither" type="checkbox"> Shading (dither) instead of pure lines</label>
-    <p class="small">Prints use the MXW01 protocol (service AE30). Protocol test page: <a href="test.html">test.html</a></p>
-  </details>
-</main>
+  </div>
+  <label class="toggle">Shading instead of pure lines <input id="dither" type="checkbox"></label>
+  <button id="reconnect" class="ghost">Reconnect printer</button>
+  <div class="note">Opened by holding the gear for 2 seconds. Protocol test page: <a href="test.html">test.html</a></div>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
 const WIDTH = 384;
 const DEFAULT_STYLE = 'A simple, cute black and white line drawing for a young child to colour in. Thick clean black outlines on a plain white background, no shading, no grey, no colour, no words or letters, one clear subject centred and filling the picture, friendly and suitable for children.';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------- settings (saved locally) ----------
 const store = {
@@ -81,65 +170,87 @@ const store = {
 };
 $('#key').value = store.get('key', '');
 $('#model').value = store.get('model', 'gemini-2.5-flash-image');
+if (!$('#model').value) $('#model').value = 'gemini-2.5-flash-image';
 $('#style').value = store.get('style', DEFAULT_STYLE);
 $('#dark').value = store.get('dark', '93');
 $('#dither').checked = store.get('dither', '0') === '1';
 const showDark = () => $('#darkVal').textContent = $('#dark').value;
 showDark();
 $('#key').onchange = () => store.set('key', $('#key').value.trim());
-$('#model').onchange = () => store.set('model', $('#model').value.trim());
+$('#model').onchange = () => store.set('model', $('#model').value);
 $('#style').onchange = () => store.set('style', $('#style').value.trim() || DEFAULT_STYLE);
 $('#dark').oninput = () => { showDark(); store.set('dark', $('#dark').value); };
 $('#dither').onchange = () => { store.set('dither', $('#dither').checked ? '1' : '0'); if (lastImage) renderPreview(lastImage); };
-if (!$('#key').value) $('#settings').open = true;
 
-function say(text, err) { const m = $('#msg'); m.textContent = text; m.className = err ? 'err' : ''; }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// ---------- settings sheet (hold gear 2s) ----------
+function openSheet() { $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); }
+function closeSheet() {
+  $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open');
+  if (document.activeElement) document.activeElement.blur();
+  if ($('#key').value.trim() && $('#stageTitle').textContent === 'Almost ready!') idle();
+}
+$('#done').onclick = closeSheet; $('#scrim').onclick = closeSheet;
+let holdTimer = null;
+const gear = $('#gear');
+function holdStart(e) { e.preventDefault(); gear.classList.add('holding'); holdTimer = setTimeout(() => { holdTimer = null; gear.classList.remove('holding'); openSheet(); }, 2000); }
+function holdEnd() { gear.classList.remove('holding'); if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; toast('Grown-ups: hold for 2 seconds'); } }
+gear.addEventListener('touchstart', holdStart, { passive: false });
+gear.addEventListener('touchend', holdEnd); gear.addEventListener('touchcancel', holdEnd);
+gear.addEventListener('mousedown', holdStart); gear.addEventListener('mouseup', holdEnd);
+gear.addEventListener('mouseleave', () => { if (holdTimer) holdEnd(); });
+gear.addEventListener('contextmenu', e => e.preventDefault());
+
+let toastTimer;
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2000); }
+
+// ---------- stage states ----------
+function stage(kind, title, text) {
+  $('#preview').style.display = kind === 'image' ? 'block' : 'none';
+  $('#placeholder').style.display = kind === 'image' ? 'none' : 'flex';
+  $('#stage').classList.toggle('empty', kind === 'idle');
+  $('#bubble').classList.toggle('wiggle', kind === 'busy');
+  if (title !== undefined) $('#stageTitle').textContent = title;
+  if (text !== undefined) { $('#stageText').textContent = text; $('#stageText').className = kind === 'error' ? 'err' : ''; }
+}
+function showRow(result) { $('#askRow').classList.toggle('hidden', result); $('#resultRow').classList.toggle('hidden', !result); }
+function idle() { stage('idle', 'What shall we draw?', 'Tap the microphone and say anything you like.'); showRow(false); }
+$('#idea').addEventListener('input', () => { if (!$('#resultRow').classList.contains('hidden')) showRow(false); });
+$('#idea').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#idea').blur(); generate(); } });
 
 // ---------- speech ----------
-// Bluefy exposes the speech API but it often fails instantly, so on any quick failure
-// we switch to the keyboard's own dictation mic (which always works on iPhone).
 let SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (store.get('noSR', '0') === '1') SR = null;
 let rec = null, recStarted = 0;
-function useKeyboardMic(reason) {
-  $('#idea').focus();
-  say('Tap the 🎤 on the keyboard to talk, then tap Draw it!' + (reason ? ` (${reason})` : ''));
-}
+function useKeyboardMic() { $('#idea').focus(); stage('idle', 'Use the keyboard mic', 'Tap the microphone on the keyboard, talk, then tap Draw it!'); }
 $('#mic').onclick = () => {
   if (!SR) { useKeyboardMic(); return; }
   if (rec) { rec.stop(); return; }
-  rec = new SR();
-  rec.lang = 'en-GB'; rec.interimResults = true; rec.maxAlternatives = 1;
+  rec = new SR(); rec.lang = 'en-GB'; rec.interimResults = true; rec.maxAlternatives = 1;
   let failed = false;
   rec.onresult = e => { $('#idea').value = Array.from(e.results).map(r => r[0].transcript).join(' '); };
   rec.onerror = e => {
     failed = true;
-    const quick = Date.now() - recStarted < 1500;
-    if (e.error !== 'no-speech' && e.error !== 'aborted' && (quick || /allowed|capture|network/.test(e.error))) {
-      SR = null; store.set('noSR', '1');
-      useKeyboardMic('voice button not supported here: ' + e.error);
-    } else say('Didn\'t catch that – try again.', true);
+    if (e.error !== 'no-speech' && e.error !== 'aborted' && (Date.now() - recStarted < 1500 || /allowed|capture|network/.test(e.error))) {
+      SR = null; store.set('noSR', '1'); useKeyboardMic();
+    } else stage('error', 'Didn\'t catch that', 'Tap the microphone and try again.');
   };
-  rec.onend = () => { $('#mic').classList.remove('listening'); rec = null; if (!failed && $('#idea').value.trim()) $('#draw').click(); };
-  $('#mic').classList.add('listening'); say('Listening…');
-  try { recStarted = Date.now(); rec.start(); }
-  catch (e) { rec = null; SR = null; $('#mic').classList.remove('listening'); useKeyboardMic(); }
+  rec.onend = () => { $('#mic').classList.remove('listening'); rec = null; if (!failed && $('#idea').value.trim()) generate(); };
+  $('#mic').classList.add('listening'); stage('idle', 'Listening…', 'Say what you want to draw.');
+  try { recStarted = Date.now(); rec.start(); } catch { rec = null; SR = null; $('#mic').classList.remove('listening'); useKeyboardMic(); }
 };
-$('#idea').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#idea').blur(); $('#draw').click(); } });
 
 // ---------- Gemini ----------
-let lastImage = null, lastRows = null;
+let lastImage = null, lastRows = null, busy = false;
 async function generate() {
+  if (busy) return;
   const idea = $('#idea').value.trim();
   const key = ($('#key').value || '').trim();
-  if (!idea) { say('Say or type what to draw first!', true); return; }
-  if (!key) { $('#settings').open = true; say('A grown-up needs to add the Gemini key in settings.', true); return; }
-  $('#draw').disabled = true; $('#print').style.display = 'none'; $('#again').style.display = 'none';
-  say('');
-  $('#msg').innerHTML = '<span class="spinner">✏️</span> Drawing…';
+  if (!idea) { $('#idea').focus(); stage('idle', 'What shall we draw?', 'Say or type an idea first!'); return; }
+  if (!key) { stage('error', 'Almost ready!', 'A grown-up needs to add the Gemini key (hold the gear).'); return; }
+  busy = true; $('#draw').disabled = $('#again').disabled = $('#print').disabled = true;
+  stage('busy', 'Drawing…', `“${idea}”`);
   try {
-    const chosen = ($('#model').value || 'gemini-2.5-flash-image').trim();
+    const chosen = $('#model').value || 'gemini-2.5-flash-image';
     const models = [chosen, 'gemini-2.5-flash-image', 'gemini-3.1-flash-image'].filter((m, i, a) => a.indexOf(m) === i);
     const prompt = `${$('#style').value || DEFAULT_STYLE}\nDraw: ${idea}`;
     let res, json;
@@ -150,67 +261,47 @@ async function generate() {
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE', 'TEXT'] } })
       });
       json = await res.json().catch(() => ({}));
-      if (res.status !== 404) break; // model missing -> try the next one
+      if (res.status !== 404) break;
     }
     if (!res.ok) throw new Error(json.error?.message || `HTTP ${res.status}`);
     const parts = json.candidates?.[0]?.content?.parts || [];
     const imgPart = parts.find(p => p.inlineData || p.inline_data);
-    if (!imgPart) {
-      const reason = json.candidates?.[0]?.finishReason || json.promptFeedback?.blockReason || '';
-      throw new Error(reason ? `No picture came back (${reason}). Try asking differently.` : 'No picture came back. Try again.');
-    }
+    if (!imgPart) throw new Error('No picture came back – try asking a different way.');
     const d = imgPart.inlineData || imgPart.inline_data;
     const img = new Image();
     img.src = `data:${d.mimeType || d.mime_type || 'image/png'};base64,${d.data}`;
     await img.decode();
-    lastImage = img;
-    renderPreview(img);
-    say('Ta-da! Print it, or try again.');
-    $('#print').style.display = ''; $('#again').style.display = '';
+    lastImage = img; renderPreview(img);
+    stage('image'); showRow(true);
   } catch (e) {
-    say('Oops: ' + e.message, true);
-  } finally { $('#draw').disabled = false; }
+    stage('error', 'Oops!', e.message || String(e)); showRow(false);
+  } finally { busy = false; $('#draw').disabled = $('#again').disabled = $('#print').disabled = false; }
 }
 $('#draw').onclick = generate;
 $('#again').onclick = generate;
 
 // ---------- image -> 1-bit rows ----------
 function renderPreview(img) {
-  const scale = WIDTH / img.naturalWidth;
-  const h = Math.max(90, Math.round(img.naturalHeight * scale));
-  const c = $('#preview');
-  c.width = WIDTH; c.height = h; c.style.display = 'block';
+  const h = Math.max(90, Math.round(img.naturalHeight * WIDTH / img.naturalWidth));
+  const c = $('#preview'); c.width = WIDTH; c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = '#fff'; g.fillRect(0, 0, WIDTH, h);
-  g.drawImage(img, 0, 0, WIDTH, h);
-  const id = g.getImageData(0, 0, WIDTH, h);
-  const p = id.data;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, WIDTH, h); g.drawImage(img, 0, 0, WIDTH, h);
+  const id = g.getImageData(0, 0, WIDTH, h), p = id.data;
   const lum = new Float32Array(WIDTH * h);
   for (let i = 0; i < lum.length; i++) lum[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
-  const dither = $('#dither').checked;
-  const black = new Uint8Array(WIDTH * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < WIDTH; x++) {
-    const i = y * WIDTH + x, old = lum[i];
-    const v = dither ? (old < 128 ? 0 : 255) : (old < 170 ? 0 : 255);
-    black[i] = v === 0 ? 1 : 0;
-    if (dither) {
-      const err = old - v;
-      if (x + 1 < WIDTH) lum[i + 1] += err * 7 / 16;
-      if (y + 1 < h) {
-        if (x > 0) lum[i + WIDTH - 1] += err * 3 / 16;
-        lum[i + WIDTH] += err * 5 / 16;
-        if (x + 1 < WIDTH) lum[i + WIDTH + 1] += err * 1 / 16;
-      }
-    }
-  }
-  const rows = [];
+  const dither = $('#dither').checked, rows = [];
   for (let y = 0; y < h; y++) {
     const row = new Uint8Array(WIDTH / 8);
     for (let x = 0; x < WIDTH; x++) {
-      const i = y * WIDTH + x;
-      const on = black[i];
+      const i = y * WIDTH + x, old = lum[i];
+      const on = dither ? old < 128 : old < 170;
+      if (dither) {
+        const err = old - (on ? 0 : 255);
+        if (x + 1 < WIDTH) lum[i + 1] += err * 7 / 16;
+        if (y + 1 < h) { if (x > 0) lum[i + WIDTH - 1] += err * 3 / 16; lum[i + WIDTH] += err * 5 / 16; if (x + 1 < WIDTH) lum[i + WIDTH + 1] += err / 16; }
+      }
       p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = on ? 0 : 255;
-      if (on) row[x >> 3] |= 1 << (x & 7); // LSB-first, confirmed by test B
+      if (on) row[x >> 3] |= 1 << (x & 7); // LSB-first (MXW01)
     }
     rows.push(row);
   }
@@ -218,7 +309,7 @@ function renderPreview(img) {
   lastRows = rows;
 }
 
-// ---------- printer (MXW01 protocol) ----------
+// ---------- printer (MXW01 protocol over BLE service AE30) ----------
 const CRC = (() => { const t = new Uint8Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) c = c & 0x80 ? ((c << 1) ^ 7) & 255 : (c << 1) & 255; t[i] = c; } return t; })();
 const crc8 = d => { let c = 0; for (const b of d) c = CRC[(c ^ b) & 255]; return c; };
 function mxw(cmd, data) {
@@ -242,46 +333,44 @@ function onNotify(e) {
   const len = b[4] | (b[5] << 8), msg = { cmd: b[2], data: b.slice(6, 6 + len) };
   for (const w of [...waiters]) if (w.cmd === msg.cmd) { waiters.splice(waiters.indexOf(w), 1); w.res(msg); }
 }
-async function send(ch, bytes) {
-  if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(bytes); else await ch.writeValue(bytes);
-}
-function setConnected(on) {
-  const b = $('#connect'); b.textContent = on ? '✅ Printer ready' : 'Connect printer'; b.classList.toggle('on', on);
-}
+async function send(ch, bytes) { if (ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(bytes); else await ch.writeValue(bytes); }
+function chip(state, text) { const c = $('#chip'); c.classList.toggle('on', state === 'on'); c.classList.toggle('busy', state === 'busy'); $('#chipText').textContent = text; }
 async function connect() {
-  if (!navigator.bluetooth) { say('Open this page in Bluefy (iPhone) or Chrome (Android).', true); return false; }
+  if (!navigator.bluetooth) { stage('error', 'Wrong browser', 'Open this page in Bluefy (iPhone) or Chrome (Android).'); return false; }
+  chip('busy', 'Connecting…');
   try {
     const optionalServices = [U('ae30')];
     try { device = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: 'Reka' }], optionalServices }); }
     catch (e) { if (e && e.name === 'NotFoundError' && /cancel/i.test(e.message || '')) throw e; device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices }); }
-    device.addEventListener('gattserverdisconnected', () => { ctrl = dataCh = null; setConnected(false); });
+    device.addEventListener('gattserverdisconnected', () => { ctrl = dataCh = null; chip('off', 'Connect printer'); });
     const server = await device.gatt.connect();
     const svc = await server.getPrimaryService(U('ae30'));
     const chars = {};
     for (const c of await svc.getCharacteristics()) chars[shortId(c.uuid)] = c;
     ctrl = chars.ae01; dataCh = chars.ae03 || chars.ae01;
-    if (!ctrl || !chars.ae02) throw new Error('This doesn\'t look like the Reka printer.');
+    if (!ctrl || !chars.ae02) throw new Error('That doesn\'t look like the Reka printer.');
     await chars.ae02.startNotifications();
     chars.ae02.addEventListener('characteristicvaluechanged', onNotify);
-    setConnected(true); say('Printer connected!');
+    chip('on', 'Printer ready');
     return true;
   } catch (e) {
-    setConnected(false);
-    say('Couldn\'t connect: ' + (e && (e.message || e.name) || e) + '. Is the printer on, and Fun Print closed?', true);
+    chip('off', 'Connect printer');
+    toast('Couldn\'t connect – is it on?');
     return false;
   }
 }
-$('#connect').onclick = connect;
+$('#chip').onclick = () => { if (!ctrl) connect(); else toast('Printer is connected'); };
+$('#reconnect').onclick = async () => { closeSheet(); try { if (device && device.gatt.connected) device.gatt.disconnect(); } catch {} ctrl = null; await connect(); };
 
 $('#print').onclick = async () => {
-  if (!lastRows) return;
+  if (!lastRows || busy) return;
   if (!ctrl && !(await connect())) return;
-  $('#print').disabled = true; $('#again').disabled = true;
+  busy = true; $('#print').disabled = $('#again').disabled = true;
+  chip('busy', 'Printing…');
   try {
     const rows = lastRows.slice();
-    for (let i = 0; i < 100; i++) rows.push(new Uint8Array(48)); // feed so the whole picture clears the cutter
+    for (let i = 0; i < 100; i++) rows.push(new Uint8Array(48)); // feed so the picture clears the tear edge
     const n = rows.length;
-    say('Printing… 🖨️');
     await send(ctrl, mxw(0xA2, [Number($('#dark').value) & 255])); await sleep(80);
     const st = waitFor(0xA1, 2500).catch(() => null);
     await send(ctrl, mxw(0xA1, [0])); await st;
@@ -293,11 +382,14 @@ $('#print').onclick = async () => {
     const done = waitFor(0xAA, 30000).catch(() => null);
     await send(ctrl, mxw(0xAD, [0]));
     await done;
-    say('Done! 🎉');
+    toast('Printed! 🎉');
   } catch (e) {
-    say('Printing problem: ' + (e.message || e), true);
-  } finally { $('#print').disabled = false; $('#again').disabled = false; }
+    toast(e.message || 'Printing problem');
+  } finally { busy = false; $('#print').disabled = $('#again').disabled = false; chip(ctrl ? 'on' : 'off', ctrl ? 'Printer ready' : 'Connect printer'); }
 };
+
+idle();
+if (!$('#key').value) stage('error', 'Almost ready!', 'A grown-up needs to add the Gemini key (hold the gear).');
 </script>
 </body>
 </html>
