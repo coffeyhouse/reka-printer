@@ -134,7 +134,13 @@ async function connect(showAll) {
     const opts = showAll ? { acceptAllDevices: true, optionalServices }
       : { filters: [{ namePrefix: 'Reka' }, { services: [0xaf30] }, { services: [0xae30] }], optionalServices };
     log('Opening Bluetooth chooser…');
-    device = await navigator.bluetooth.requestDevice(opts);
+    try {
+      device = await navigator.bluetooth.requestDevice(opts);
+    } catch (e) {
+      if (showAll) throw e;
+      log(`Filtered scan failed (${e && e.message || e}). Showing all devices instead – pick 'Reka'.`);
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices });
+    }
     device.addEventListener('gattserverdisconnected', () => { $('#status').textContent = 'Disconnected'; setButtons(false); log('Disconnected'); });
     log(`Connecting to '${device.name}'…`);
     server = await device.gatt.connect();
@@ -160,7 +166,7 @@ async function connect(showAll) {
     if (!chars['01']) log('WARNING: no xx01 write characteristic found in AE30/AF30');
     $('#status').textContent = `Connected to ${device.name}`;
     setButtons(true);
-  } catch (e) { log('Connect failed: ' + e.message); }
+  } catch (e) { log('Connect failed: ' + (e && (e.message || e.name) || e)); }
 }
 function setButtons(on) { document.querySelectorAll('[data-test], #status-btn').forEach(b => b.disabled = !on); }
 
