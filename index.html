@@ -57,6 +57,13 @@
            font-family: Fredoka, sans-serif; font-weight: 600; font-size: 17px; display: flex; align-items: center; gap: 6px; }
   .style .e { font-size: 20px; }
   .style[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .btn { position: relative; }
+  .badge { position: absolute; top: -9px; right: -2px; background: var(--ink); color: #fff; font-family: Nunito, sans-serif; font-weight: 800; font-size: 13px;
+           padding: 4px 9px; border-radius: 99px; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+  .badge.low { background: #E8412F; }
+  .row2 { display: flex; gap: 10px; }
+  .row2 input { width: 90px; height: 48px; border-radius: 14px; border: 2px solid var(--line); padding: 0 12px; font-size: 16px; font-family: Nunito, sans-serif; }
+  .row2 .ghost { flex: 1; height: 48px; }
   .hidden { display: none !important; }
   .toast { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 13px; font-weight: 800;
            padding: 8px 12px; border-radius: 99px; white-space: nowrap; opacity: 0; transition: opacity .2s; pointer-events: none; }
@@ -122,12 +129,14 @@
     <button id="draw" class="btn draw">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
       Draw it!
+      <span class="badge" data-left></span>
     </button>
   </div>
   <div id="resultRow" class="actions hidden">
     <button id="again" class="btn again">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
       Try again
+      <span class="badge" data-left></span>
     </button>
     <button id="print" class="btn print">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -160,6 +169,10 @@
   <div class="field">
     <label for="dark">Print darkness <span id="darkVal"></span></label>
     <input id="dark" type="range" min="40" max="140" step="5">
+  </div>
+  <div class="field">
+    <label for="limit">Drawings per day <span id="usedToday"></span></label>
+    <div class="row2"><input id="limit" type="number" min="1" max="200" inputmode="numeric"><button id="bonus" class="ghost">Give 5 more today</button></div>
   </div>
   <button id="reconnect" class="ghost">Reconnect printer</button>
   <div class="note">Opened by holding the gear for 2 seconds. Protocol test page: <a href="test.html">test.html</a></div>
@@ -199,6 +212,25 @@ $('#key').onchange = () => store.set('key', $('#key').value.trim());
 $('#model').onchange = () => store.set('model', $('#model').value);
 $('#base').onchange = () => store.set('base', $('#base').value.trim() || DEFAULT_BASE);
 $('#dark').oninput = () => { showDark(); store.set('dark', $('#dark').value); };
+// ---------- daily limit ----------
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function quota() {
+  if (store.get('day', '') !== today()) { store.set('day', today()); store.set('used', '0'); store.set('bonus', '0'); }
+  const limit = Math.max(1, parseInt(store.get('limit', '15'), 10) || 15);
+  const used = parseInt(store.get('used', '0'), 10) || 0, bonus = parseInt(store.get('bonus', '0'), 10) || 0;
+  return { limit, used, bonus, left: Math.max(0, limit + bonus - used) };
+}
+function showQuota() {
+  const q = quota();
+  document.querySelectorAll('[data-left]').forEach(b => { b.textContent = `${q.left} left`; b.classList.toggle('low', q.left <= 3); });
+  $('#usedToday').textContent = `${q.used} used today`;
+}
+$('#limit').value = quota().limit;
+$('#limit').onchange = () => { const v = parseInt($('#limit').value, 10); if (v > 0) store.set('limit', String(v)); $('#limit').value = quota().limit; showQuota(); };
+$('#bonus').onclick = () => { const q = quota(); store.set('bonus', String(q.bonus + 5)); showQuota(); toast('5 more drawings added for today'); if ($('#stageTitle').textContent === 'Magic needs a rest!') idle(); };
+showQuota();
+setInterval(showQuota, 60000); // picks up the midnight reset
+
 // style chips
 function drawChips() {
   const box = $('#styles'); box.innerHTML = '';
@@ -281,6 +313,10 @@ async function generate() {
   const key = ($('#key').value || '').trim();
   if (!idea) { $('#idea').focus(); stage('idle', 'What shall we draw?', 'Say or type an idea first!'); return; }
   if (!key) { stage('error', 'Almost ready!', 'A grown-up needs to add the Gemini key (hold the gear).'); return; }
+  if (quota().left <= 0) {
+    stage('busy', 'Magic needs a rest!', 'You\'ve used all your drawings for today. Come back tomorrow for more!');
+    $('#bubble').classList.remove('wiggle'); showRow(false); return;
+  }
   busy = true; $('#draw').disabled = $('#again').disabled = $('#print').disabled = true;
   stage('busy', 'Drawing…', `“${idea}”`);
   try {
@@ -309,6 +345,7 @@ async function generate() {
     img.src = `data:${d.mimeType || d.mime_type || 'image/png'};base64,${d.data}`;
     await img.decode();
     lastImage = img; renderPreview(img);
+    store.set('used', String(quota().used + 1)); showQuota();
     stage('image'); showRow(true);
     if (styleId === 'random') toast(`Surprise: ${usedStyle.e} ${usedStyle.name}`);
   } catch (e) {
