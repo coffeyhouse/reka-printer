@@ -97,19 +97,36 @@ function say(text, err) { const m = $('#msg'); m.textContent = text; m.className
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ---------- speech ----------
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null;
+// Bluefy exposes the speech API but it often fails instantly, so on any quick failure
+// we switch to the keyboard's own dictation mic (which always works on iPhone).
+let SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (store.get('noSR', '0') === '1') SR = null;
+let rec = null, recStarted = 0;
+function useKeyboardMic(reason) {
+  $('#idea').focus();
+  say('Tap the 🎤 on the keyboard to talk, then tap Draw it!' + (reason ? ` (${reason})` : ''));
+}
 $('#mic').onclick = () => {
-  if (!SR) { $('#idea').focus(); say('Tap the 🎤 on the keyboard to talk.'); return; }
+  if (!SR) { useKeyboardMic(); return; }
   if (rec) { rec.stop(); return; }
   rec = new SR();
   rec.lang = 'en-GB'; rec.interimResults = true; rec.maxAlternatives = 1;
+  let failed = false;
   rec.onresult = e => { $('#idea').value = Array.from(e.results).map(r => r[0].transcript).join(' '); };
-  rec.onerror = e => { say(e.error === 'not-allowed' ? 'Microphone not allowed – tap the 🎤 on the keyboard instead.' : 'Didn\'t catch that – try again.', true); };
-  rec.onend = () => { $('#mic').classList.remove('listening'); rec = null; if ($('#idea').value.trim()) $('#draw').click(); };
+  rec.onerror = e => {
+    failed = true;
+    const quick = Date.now() - recStarted < 1500;
+    if (e.error !== 'no-speech' && e.error !== 'aborted' && (quick || /allowed|capture|network/.test(e.error))) {
+      SR = null; store.set('noSR', '1');
+      useKeyboardMic('voice button not supported here: ' + e.error);
+    } else say('Didn\'t catch that – try again.', true);
+  };
+  rec.onend = () => { $('#mic').classList.remove('listening'); rec = null; if (!failed && $('#idea').value.trim()) $('#draw').click(); };
   $('#mic').classList.add('listening'); say('Listening…');
-  try { rec.start(); } catch (e) { rec = null; $('#mic').classList.remove('listening'); $('#idea').focus(); say('Tap the 🎤 on the keyboard to talk.'); }
+  try { recStarted = Date.now(); rec.start(); }
+  catch (e) { rec = null; SR = null; $('#mic').classList.remove('listening'); useKeyboardMic(); }
 };
+$('#idea').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#idea').blur(); $('#draw').click(); } });
 
 // ---------- Gemini ----------
 let lastImage = null, lastRows = null;
