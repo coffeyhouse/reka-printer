@@ -157,8 +157,8 @@
   <div class="field">
     <label for="model">Image model</label>
     <select id="model">
-      <option value="gemini-2.5-flash-image">Nano Banana (gemini-2.5-flash-image)</option>
-      <option value="gemini-3.1-flash-image">Nano Banana 2 (gemini-3.1-flash-image)</option>
+      <option value="gemini-nano-banana-2.1">Nano Banana 2.1 (latest)</option>
+      <option value="gemini-2.5-flash-image">Nano Banana (older, legacy)</option>
     </select>
   </div>
   <div class="field">
@@ -201,15 +201,15 @@ const store = {
   set(k, v) { try { localStorage.setItem('mp_' + k, v); } catch {} }
 };
 $('#key').value = store.get('key', '');
-$('#model').value = store.get('model', 'gemini-2.5-flash-image');
-if (!$('#model').value) $('#model').value = 'gemini-2.5-flash-image';
+$('#model').value = store.get('model2', 'gemini-nano-banana-2.1');
+if (!$('#model').value) $('#model').value = 'gemini-nano-banana-2.1';
 $('#base').value = store.get('base', DEFAULT_BASE);
 styleId = STYLES.some(x => x.id === store.get('styleId', '')) ? store.get('styleId', '') : 'colour';
 $('#dark').value = store.get('dark', '93');
 const showDark = () => $('#darkVal').textContent = $('#dark').value;
 showDark();
 $('#key').onchange = () => store.set('key', $('#key').value.trim());
-$('#model').onchange = () => store.set('model', $('#model').value);
+$('#model').onchange = () => store.set('model2', $('#model').value);
 $('#base').onchange = () => store.set('base', $('#base').value.trim() || DEFAULT_BASE);
 $('#dark').oninput = () => { showDark(); store.set('dark', $('#dark').value); };
 // ---------- daily limit ----------
@@ -320,8 +320,8 @@ async function generate() {
   busy = true; $('#draw').disabled = $('#again').disabled = $('#print').disabled = true;
   stage('busy', 'Drawing…', `“${idea}”`);
   try {
-    const chosen = $('#model').value || 'gemini-2.5-flash-image';
-    const models = [chosen, 'gemini-2.5-flash-image', 'gemini-3.1-flash-image'].filter((m, i, a) => a.indexOf(m) === i);
+    const chosen = $('#model').value || 'gemini-nano-banana-2.1';
+    const models = [chosen, 'gemini-nano-banana-2.1', 'gemini-2.5-flash-image'].filter((m, i, a) => a.indexOf(m) === i);
     let st = STYLES.find(x => x.id === styleId) || STYLES[0];
     if (st.id === 'random') { const pool = STYLES.filter(x => x.id !== 'random'); st = pool[Math.floor(Math.random() * pool.length)]; }
     usedStyle = st;
