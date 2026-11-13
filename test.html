@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reka Printer Protocol Test</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px; background: #f4f6f5; color: #1b1f1d; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { margin: 0 0 14px; color: #556; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  button { font-size: 16px; padding: 12px 14px; border-radius: 10px; border: 0; background: #1f8a70; color: #fff; flex: 1 1 45%; }
+  button.alt { background: #34495e; }
+  button.ghost { background: #dfe6e3; color: #1b1f1d; }
+  button:disabled { opacity: .4; }
+  label { font-size: 14px; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  #status { font-weight: 600; margin: 6px 0 10px; }
+  #log { background: #111; color: #9fe8c9; font: 12px/1.4 ui-monospace, Menlo, monospace; padding: 10px; border-radius: 10px; height: 46vh; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .hint { font-size: 13px; color: #556; margin: 8px 0; }
+</style>
+</head>
+<body>
+<h1>Reka printer protocol test</h1>
+<p class="sub">Close Fun Print first. Connect, then try each test. Each one prints its own letter so you can tell which worked.</p>
+
+<div class="row">
+  <button id="connect">Connect (Reka)</button>
+  <button id="connectAll" class="ghost">Connect (show all)</button>
+</div>
+<div id="status">Not connected</div>
+
+<label><input type="checkbox" id="msb"> Flip bit order (try if a print comes out as garbled stripes)</label>
+
+<div class="row">
+  <button data-test="A" disabled>Test A – classic cat</button>
+  <button data-test="B" disabled>Test B – MXW01 style</button>
+  <button data-test="C" class="alt" disabled>Test C – ESC/POS on AE01</button>
+  <button data-test="D" class="alt" disabled>Test D – ESC/POS on AE10</button>
+</div>
+<div class="row">
+  <button id="status-btn" class="ghost" disabled>Ask printer for status</button>
+  <button id="copy" class="ghost">Copy log</button>
+</div>
+<p class="hint">If nothing prints, tap "Ask printer for status", then copy the log and paste it back to Claude.</p>
+<div id="log"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const logEl = $('#log');
+function log(msg) {
+  const t = new Date().toTimeString().slice(0, 8);
+  logEl.textContent += `[${t}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const hex = a => Array.from(a, b => b.toString(16).padStart(2, '0')).join(' ');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- CRC8 (poly 0x07) and packet framing ----------
+const CRC_TABLE = (() => { const t = new Uint8Array(256); for (let i = 0; i < 256; i++) { let c = i; for (let j = 0; j < 8; j++) c = (c & 0x80) ? ((c << 1) ^ 0x07) & 0xff : (c << 1) & 0xff; t[i] = c; } return t; })();
+function crc8(d) { let c = 0; for (const b of d) c = CRC_TABLE[(c ^ b) & 0xff]; return c; }
+function pkt(h1, h2, cmd, data) {
+  data = Uint8Array.from(data);
+  const p = new Uint8Array(8 + data.length);
+  p.set([h1, h2, cmd, 0x00, data.length & 0xff, data.length >> 8]);
+  p.set(data, 6);
+  p[6 + data.length] = crc8(data);
+  p[7 + data.length] = 0xff;
+  return p;
+}
+const cat = (cmd, data) => pkt(0x51, 0x78, cmd, data);
+const mxw = (cmd, data) => pkt(0x22, 0x21, cmd, data);
+
+// ---------- Test image ----------
+const WIDTH = 384;
+function makeRows(letter, msbFirst, height = 140) {
+  const c = document.createElement('canvas');
+  c.width = WIDTH; c.height = height;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, WIDTH, height);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, WIDTH, 8); g.fillRect(0, height - 8, WIDTH, 8);
+  g.fillRect(0, 0, 8, height); g.fillRect(WIDTH - 8, 0, 8, height);
+  g.font = 'bold 100px sans-serif'; g.textBaseline = 'middle';
+  g.fillText(letter, 24, height / 2 + 4);
+  g.font = 'bold 30px sans-serif';
+  g.fillText('TEST ' + letter, 120, height / 2 - 18);
+  g.font = '22px sans-serif';
+  g.fillText(msbFirst ? 'bit order: MSB' : 'bit order: LSB', 120, height / 2 + 22);
+  const px = g.getImageData(0, 0, WIDTH, height).data;
+  const rows = [];
+  for (let y = 0; y < height; y++) {
+    const row = new Uint8Array(WIDTH / 8);
+    for (let x = 0; x < WIDTH; x++) {
+      const i = (y * WIDTH + x) * 4;
+      const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      if (lum < 128) row[x >> 3] |= msbFirst ? (0x80 >> (x & 7)) : (1 << (x & 7));
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ---------- Bluetooth ----------
+let device, server, chars = {};
+// Bluefy reports short UUIDs like 'AE30'; Chrome reports full 128-bit ones.
+function shortId(u) { u = String(u).toLowerCase(); return u.length > 8 ? u.slice(4, 8) : u.padStart(4, '0').slice(-4); }
+const listeners = [];
+function waitFor(pred, ms) {
+  return new Promise((resolve, reject) => {
+    const entry = { pred, resolve };
+    listeners.push(entry);
+    setTimeout(() => { const i = listeners.indexOf(entry); if (i >= 0) { listeners.splice(i, 1); reject(new Error('timeout')); } }, ms);
+  });
+}
+function onNotify(name, ev) {
+  const b = new Uint8Array(ev.target.value.buffer);
+  let msg = { raw: b, cmd: null, data: b };
+  if (b.length >= 6 && ((b[0] === 0x22 && b[1] === 0x21) || (b[0] === 0x51 && b[1] === 0x78))) {
+    const len = b[4] | (b[5] << 8);
+    msg = { raw: b, cmd: b[2], data: b.slice(6, 6 + len) };
+  }
+  log(`← ${name}: ${hex(b)}`);
+  for (const l of [...listeners]) if (l.pred(msg)) { listeners.splice(listeners.indexOf(l), 1); l.resolve(msg); }
+}
+async function write(ch, bytes, label) {
+  if (!ch) throw new Error('characteristic missing');
+  if (label) log(`→ ${label}: ${hex(bytes.slice(0, 24))}${bytes.length > 24 ? ' …' : ''}`);
+  if (ch.properties.writeWithoutResponse && ch.writeValueWithoutResponse) await ch.writeValueWithoutResponse(bytes);
+  else if (ch.writeValueWithResponse) await ch.writeValueWithResponse(bytes);
+  else await ch.writeValue(bytes);
+}
+
+async function connect(showAll) {
+  try {
+    const U = id => `0000${id}-0000-1000-8000-00805f9b34fb`;
+    const optionalServices = [U('ae30'), U('af30')];
+    const opts = showAll ? { acceptAllDevices: true, optionalServices }
+      : { filters: [{ namePrefix: 'Reka' }], optionalServices };
+    log('Opening Bluetooth chooser…');
+    try {
+      device = await navigator.bluetooth.requestDevice(opts);
+    } catch (e) {
+      if (showAll) throw e;
+      log(`Filtered scan failed (${e && e.message || e}). Showing all devices instead – pick 'Reka'.`);
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices });
+    }
+    device.addEventListener('gattserverdisconnected', () => { $('#status').textContent = 'Disconnected'; setButtons(false); log('Disconnected'); });
+    log(`Connecting to '${device.name}'…`);
+    server = await device.gatt.connect();
+    chars = {};
+    const services = await server.getPrimaryServices();
+    for (const s of services) {
+      const sid = shortId(s.uuid);
+      log(`Service ${sid} (${s.uuid})`);
+      let cs = [];
+      try { cs = await s.getCharacteristics(); } catch (e) { log('  (could not list characteristics)'); }
+      for (const c of cs) {
+        const id = shortId(c.uuid);
+        const p = c.properties;
+        const props = ['read', 'write', 'writeWithoutResponse', 'notify', 'indicate'].filter(k => p[k]).join(', ');
+        log(`  char ${id}: ${props || 'none'}`);
+        if (sid === 'ae30' || sid === 'af30') chars[id.slice(2)] = c; // keys: '01','02','03','04','05','10'
+        if (p.notify || p.indicate) {
+          try { await c.startNotifications(); c.addEventListener('characteristicvaluechanged', e => onNotify(id, e)); log(`  subscribed to ${id}`); }
+          catch (e) { log(`  could not subscribe ${id}: ${e.message}`); }
+        }
+      }
+    }
+    if (!chars['01']) log('WARNING: no xx01 write characteristic found in AE30/AF30');
+    $('#status').textContent = `Connected to ${device.name}`;
+    setButtons(true);
+  } catch (e) { log('Connect failed: ' + (e && (e.message || e.name) || e)); }
+}
+function setButtons(on) { document.querySelectorAll('[data-test], #status-btn').forEach(b => b.disabled = !on); }
+
+// ---------- Test A: classic cat printer (51 78 …) ----------
+async function testA(msb) {
+  const ch = chars['01'];
+  const rows = makeRows('A', msb);
+  await write(ch, cat(0xA3, [0x00]), 'get state'); await sleep(100);
+  await write(ch, cat(0xA4, [0x33]), 'quality'); await sleep(30);
+  await write(ch, cat(0xAF, [0xE0, 0x2E]), 'energy'); await sleep(30);
+  await write(ch, cat(0xBE, [0x01]), 'apply energy'); await sleep(30);
+  await write(ch, cat(0xBD, [0x20]), 'speed'); await sleep(30);
+  await write(ch, cat(0xA6, [0xAA, 0x55, 0x17, 0x38, 0x44, 0x5F, 0x5F, 0x5F, 0x44, 0x38, 0x2C]), 'lattice start'); await sleep(30);
+  log(`sending ${rows.length} lines…`);
+  for (let i = 0; i < rows.length; i++) { await write(ch, cat(0xA2, rows[i])); await sleep(12); }
+  await write(ch, cat(0xA1, [0x60, 0x00]), 'feed'); await sleep(30);
+  await write(ch, cat(0xA6, [0xAA, 0x55, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17]), 'lattice end'); await sleep(30);
+  await write(ch, cat(0xA3, [0x00]), 'get state');
+  log('Test A sent.');
+}
+
+// ---------- Test B: MXW01-style (22 21 …, data on xx03) ----------
+async function testB(msb) {
+  const ctrl = chars['01'];
+  const data = chars['03'] || chars['01'];
+  if (!chars['03']) log('No xx03 characteristic – sending image data on xx01 instead');
+  let rows = makeRows('B', msb);
+  while (rows.length < 90) rows.push(new Uint8Array(48));
+  const n = rows.length;
+  await write(ctrl, mxw(0xA2, [0x5D]), 'intensity'); await sleep(100);
+  const st = waitFor(m => m.cmd === 0xA1, 2500);
+  await write(ctrl, mxw(0xA1, [0x00]), 'status');
+  try { const r = await st; log('status reply data: ' + hex(r.data)); } catch { log('no status reply'); }
+  const pr = waitFor(m => m.cmd === 0xA9, 3000);
+  await write(ctrl, mxw(0xA9, [n & 0xff, n >> 8, 0x30, 0x00]), 'print request');
+  try { const r = await pr; log('print request reply: ' + hex(r.data) + (r.data[0] === 0 ? ' (OK)' : ' (refused?)')); } catch { log('no reply to print request'); }
+  log(`sending ${n} lines on data channel…`);
+  for (let i = 0; i < n; i++) { await write(data, rows[i]); await sleep(10); }
+  const done = waitFor(m => m.cmd === 0xAA, 20000);
+  await write(ctrl, mxw(0xAD, [0x00]), 'flush/print');
+  try { await done; log('Printer reported print complete.'); } catch { log('No "print complete" message (may still have printed).'); }
+  log('Test B sent.');
+}
+
+// ---------- Tests C/D: ESC/POS raster ----------
+async function testEscPos(letter, ch, msb) {
+  if (!ch) { log('That characteristic does not exist on this printer.'); return; }
+  const rows = makeRows(letter, !msb); // ESC/POS is MSB-first by default
+  const n = rows.length;
+  const body = new Uint8Array(8 + n * 48);
+  body.set([0x1D, 0x76, 0x30, 0x00, 48, 0, n & 0xff, n >> 8]);
+  rows.forEach((r, i) => body.set(r, 8 + i * 48));
+  const all = new Uint8Array(2 + body.length + 3);
+  all.set([0x1B, 0x40]); all.set(body, 2); all.set([0x1B, 0x64, 0x04], 2 + body.length);
+  log(`sending ESC/POS raster (${all.length} bytes)…`);
+  for (let i = 0; i < all.length; i += 96) { await write(ch, all.slice(i, i + 96)); await sleep(15); }
+  log(`Test ${letter} sent.`);
+}
+
+async function runTest(t) {
+  const msb = $('#msb').checked;
+  document.querySelectorAll('[data-test]').forEach(b => b.disabled = true);
+  log(`===== Test ${t} =====`);
+  try {
+    if (t === 'A') await testA(msb);
+    if (t === 'B') await testB(msb);
+    if (t === 'C') await testEscPos('C', chars['01'], msb);
+    if (t === 'D') await testEscPos('D', chars['10'], msb);
+  } catch (e) { log(`Test ${t} error: ${e.message}`); }
+  if (device && device.gatt.connected) setButtons(true);
+}
+
+async function askStatus() {
+  log('===== Status probe =====');
+  try {
+    await write(chars['01'], mxw(0xA1, [0x00]), 'MXW01 status'); await sleep(800);
+    await write(chars['01'], cat(0xA3, [0x00]), 'classic state'); await sleep(800);
+    await write(chars['01'], mxw(0xB1, [0x00]), 'MXW01 version'); await sleep(800);
+    log('Probe done – any replies are shown with ←');
+  } catch (e) { log('Probe error: ' + e.message); }
+}
+
+$('#connect').onclick = () => connect(false);
+$('#connectAll').onclick = () => connect(true);
+$('#status-btn').onclick = askStatus;
+document.querySelectorAll('[data-test]').forEach(b => b.onclick = () => runTest(b.dataset.test));
+$('#copy').onclick = async () => {
+  try { await navigator.clipboard.writeText(logEl.textContent); log('(log copied)'); }
+  catch { const r = document.createRange(); r.selectNodeContents(logEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); log('(select-all done – use Copy)'); }
+};
+if (!navigator.bluetooth) log('Web Bluetooth not available – open this page in Bluefy (iPhone) or Chrome (Android/laptop).');
+else log('Ready (v5). Close Fun Print, then tap Connect.');
+</script>
+</body>
