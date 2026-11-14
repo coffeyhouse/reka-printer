@@ -1,0 +1,635 @@
+:root {
+  --ground: #eef3ff;
+  --ink: #1d2340;
+  --muted: #4a5275;
+  --line: #c5d0ea;
+  --shadow: #d7e0f5;
+  --mic: #e8412f;
+  --primary: #0e7c66;
+  --print: #ffc93c;
+}
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--ground);
+  overflow: hidden;
+}
+body {
+  font-family: Nunito, system-ui, sans-serif;
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: calc(14px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom));
+  max-width: 520px;
+  margin: 0 auto;
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.brand {
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+.hdr-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 99px;
+  border: 0;
+  background: #fff;
+  font-weight: 800;
+  font-size: 13px;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: #b6bed6;
+}
+.chip.on .dot {
+  background: #1f9d55;
+}
+.chip.busy .dot {
+  background: #e0a100;
+  animation: blink 1s infinite;
+}
+.gear {
+  width: 44px;
+  height: 44px;
+  border-radius: 99px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.gear svg {
+  transition: transform 0.2s;
+}
+.gear.holding svg {
+  transform: rotate(120deg);
+  transition: transform 2s linear;
+}
+
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 6px 0 var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+.stage.empty {
+  border: 3px dashed var(--line);
+  box-shadow: none;
+}
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.bubble {
+  width: 84px;
+  height: 84px;
+  border-radius: 99px;
+  background: #fff1c9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stage h2 {
+  font-family: Fredoka, sans-serif;
+  font-weight: 600;
+  font-size: 24px;
+  margin: 0;
+  text-align: center;
+}
+.stage p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+  max-width: 270px;
+}
+.stage p.err {
+  color: #b3261e;
+}
+/* Sized and centred by fitPreview() in App.tsx, whatever the picture's shape. */
+.preview {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  image-rendering: pixelated;
+}
+.wiggle {
+  animation: wiggle 1s ease-in-out infinite;
+}
+.mine {
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 99px;
+  border: 3px solid var(--line);
+  background: #fff;
+  font-family: Fredoka, sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 0 var(--shadow);
+  flex-shrink: 0;
+}
+.mine:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--shadow);
+}
+/* Short screens (keyboard up, small phones): the words matter more than the pencil. */
+@media (max-height: 700px) {
+  .stage .bubble {
+    display: none;
+  }
+}
+
+input.idea {
+  flex-shrink: 0;
+  height: 56px;
+  width: 100%;
+  border-radius: 18px;
+  border: 3px solid var(--line);
+  background: #fff;
+  padding: 0 18px;
+  font-family: Nunito, sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--ink);
+  -webkit-user-select: text;
+  user-select: text;
+  outline: none;
+}
+input.idea:focus {
+  border-color: var(--primary);
+}
+.actions {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
+}
+.btn {
+  position: relative;
+  height: 92px;
+  border-radius: 28px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  transition:
+    transform 0.08s,
+    box-shadow 0.08s;
+}
+.btn:active {
+  transform: translateY(4px);
+}
+.btn:disabled {
+  opacity: 0.45;
+}
+.mic {
+  width: 92px;
+  flex-shrink: 0;
+  border-radius: 99px;
+  background: var(--mic);
+  color: #fff;
+  box-shadow: 0 6px 0 #b22e1f;
+}
+.mic:active {
+  box-shadow: 0 2px 0 #b22e1f;
+}
+.mic.listening {
+  animation: pulse 1s infinite;
+}
+.draw {
+  flex: 1;
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 6px 0 #095c4b;
+}
+.draw:active {
+  box-shadow: 0 2px 0 #095c4b;
+}
+.new,
+.again {
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 19px;
+  font-weight: 600;
+  background: #fff;
+  border: 3px solid var(--line);
+  box-shadow: 0 6px 0 var(--shadow);
+}
+.new {
+  width: 92px;
+}
+.again {
+  width: 112px;
+}
+.new:active,
+.again:active {
+  box-shadow: 0 2px 0 var(--shadow);
+}
+.print {
+  flex: 1;
+  min-width: 0;
+  font-size: 26px;
+  gap: 6px;
+  background: var(--print);
+  color: var(--ink);
+  box-shadow: 0 6px 0 #d9a21a;
+}
+.print:active {
+  box-shadow: 0 2px 0 #d9a21a;
+}
+.badge {
+  position: absolute;
+  top: -9px;
+  right: -2px;
+  background: var(--ink);
+  color: #fff;
+  font-family: Nunito, sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 4px 9px;
+  border-radius: 99px;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+}
+.badge.low {
+  background: #e8412f;
+}
+
+.styles {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  margin: 0 -18px;
+  padding: 2px 18px 6px;
+  scrollbar-width: none;
+}
+.styles::-webkit-scrollbar {
+  display: none;
+}
+.style {
+  flex-shrink: 0;
+  height: 48px;
+  padding: 0 14px;
+  border-radius: 99px;
+  border: 3px solid var(--line);
+  background: #fff;
+  font-family: Fredoka, sans-serif;
+  font-weight: 600;
+  font-size: 17px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.style .e {
+  font-size: 20px;
+}
+.style[aria-pressed='true'],
+.shape[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.shapes {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: -6px;
+}
+/* Five shapes across: the little outline sits above the name. */
+.shape {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  border-radius: 14px;
+  border: 3px solid var(--line);
+  background: #fff;
+  font-family: Fredoka, sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 2px;
+}
+.shape .pic {
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+.shape i {
+  display: block;
+  border: 2.5px solid currentColor;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+  border-radius: 99px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.toast.show {
+  opacity: 1;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(29, 35, 64, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.scrim.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  max-height: 92dvh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 28px 28px 0 0;
+  padding: 12px 22px calc(24px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transform: translateY(105%);
+  transition: transform 0.28s ease;
+}
+.sheet.open {
+  transform: none;
+}
+.sheet.settings {
+  -webkit-user-select: text;
+  user-select: text;
+}
+.grab {
+  align-self: center;
+  width: 44px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.sheet-head h3 {
+  font-family: Fredoka, sans-serif;
+  font-weight: 700;
+  font-size: 24px;
+  margin: 0;
+}
+.done {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 99px;
+  border: 0;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+}
+.field select,
+.field textarea {
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  padding: 0 14px;
+  font-size: 16px;
+  font-family: Nunito, sans-serif;
+  color: var(--ink);
+  background: #fff;
+}
+.field select {
+  height: 48px;
+}
+.field textarea {
+  height: 92px;
+  padding: 10px 14px;
+  resize: none;
+}
+.note {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+input[type='range'] {
+  accent-color: var(--primary);
+}
+.ghost {
+  height: 52px;
+  border-radius: 16px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.row2 {
+  display: flex;
+  gap: 10px;
+}
+.row2 input {
+  width: 90px;
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  padding: 0 12px;
+  font-size: 16px;
+  font-family: Nunito, sans-serif;
+}
+.row2 .ghost {
+  flex: 1;
+  height: 48px;
+}
+
+/* My pictures */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.tile {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 3px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+.tile:active {
+  border-color: var(--primary);
+}
+/* Wide, Banner and Long pictures get a row to themselves, the right way up. */
+.tile.across {
+  grid-column: 1 / -1;
+}
+.tile .frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 40px;
+}
+.tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tile.turned img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+.grid-note {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 24px 0;
+  margin: 0;
+}
+
+@keyframes pulse {
+  50% {
+    transform: scale(0.94);
+    opacity: 0.75;
+  }
+}
+@keyframes blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg) translateY(-4px);
+  }
+}
+
+/* Narrow phones (iPhone SE size): keep the header on one line and Print! inside its button. */
+@media (max-width: 350px) {
+  .brand {
+    font-size: 21px;
+    white-space: nowrap;
+  }
+  .chip {
+    padding: 0 9px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .actions {
+    gap: 8px;
+  }
+  .new {
+    width: 72px;
+  }
+  .again {
+    width: 92px;
+  }
+  .new,
+  .again {
+    font-size: 16px;
+  }
+  .print {
+    font-size: 22px;
+  }
+}

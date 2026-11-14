@@ -1,0 +1,10 @@
+# Only what `supabase functions deploy` needs. The database is set up by
+# running supabase/schema.sql, not by migrations (the project is shared with
+# Bookworm and Giftly, and Bookworm owns its migration history).
+# NEVER run `supabase config push` from this repo: it would overwrite the
+# shared project's settings.
+project_id = "og-prints"
+
+[functions.og-prints]
+# No sign-in: the function checks the x-space-id header itself.
+verify_jwt = false

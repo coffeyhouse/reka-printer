@@ -1,0 +1,17 @@
+node_modules
+dist
+*.local
+*.log
+.DS_Store
+
+# Secrets: never commit keys or the family link.
+.env
+.env.*
+!.env.example
+
+# Supabase CLI working files
+supabase/.temp
+supabase/.branches
+
+# Personal Claude Code settings
+.claude/settings.local.json
